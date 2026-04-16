@@ -24,6 +24,7 @@
 % makefiles.
 
 % some useful packages
+\newcommand{\todo}[1]{\textcolor{red}{TODO: #1}}
 \usepackage{times}
 \usepackage{fullpage}
 \usepackage{graphicx}
@@ -49,17 +50,15 @@
 \pagestyle{empty}
 
 \title{ %% {\it \huge Thesis Proposal}\\
-{\bf Awesome Work in Computer Science}}
-\author{Me}
-\date{January 3006}
-\Year{3006}
-\trnumber{}
+{\bf Dissecting Reinforcement Learning: Mechanisms Behind Compositional Reasoning in LLMs}}
+\author{\bf Gyeongwon James Kim}
+\date{May 2026}
+\Year{2026}
+\trnumber{CMU-CS-26-TBD}
 
 \committee{
-Nearly Divine Personage, Chair \\
-Someone else \\
-Yet another person \\
-Someone from a strange and faraway land
+Chenyan Xiong, Chair \\
+Aditi Raghunathan \\
 }
 
 \support{}
@@ -68,12 +67,12 @@ Someone from a strange and faraway land
 % copyright notice generated automatically from Year and author.
 % permission added if \permission{} given.
 
-\keywords{Stuff, More Stuff}
+\keywords{Large Language Models, Reasoning Models, Reinforcement Learning, Compositional Generalization}
 
 \maketitle
 
 \begin{dedication}
-For my dog
+For my family and friends who supported me through this journey.
 \end{dedication}
 
 \pagestyle{plain} % for toc, was empty
@@ -82,11 +81,19 @@ For my dog
 %% into different files and input them into this file...
 
 \begin{abstract}
-A short summary.
+% Hook 
+% Motivation
+Recently, Large Reasoning Models (LRMs) have achieved impressive performance on a variety of reasoning tasks, including mathematics and code generation. Their long chains of reasoning enable scaling of inference-time computation, allowing them to solve increasingly complex problems. LRMs are typically post-trained from base models using supervised fine-tuning (SFT), reinforcement learning (RL), or a combination of both. RL is often hypothesized to be a key driver of reasoning ability, as it enables models to explore and discover new solutions. However, recent work suggests that RL may instead concentrate probability mass on existing solutions.
+% Problem
+The mechanisms by which RL leads to reasoning ability remain poorly understood. In this thesis, we study RL training mechanisms through the lens of compositional generalization—a key sub-skill of reasoning that involves combining atomic skills to solve more complex problems.
+% Findings
+We find that RL-trained models substantially outperform those trained with standard SFT on this task. To isolate the effects of RL, we decompose it into three components: on-policy data, the use of negative samples, and objective design. By ablating each component, we establish a progression from SFT to RL and identify their respective contributions. Empirically, we find that both on-policy data and negative samples are critical for the emergence of compositional generalization, while objective design choices (e.g., group normalization) have a relatively small impact.
+% conclusion
+Our findings suggest that effective post-training of LLMs requires understanding and carefully designing the individual components of the training pipeline, rather than treating RL as a monolithic improvement.
 \end{abstract}
 
 \begin{acknowledgments}
-My advisor is cool.
+
 \end{acknowledgments}
 
 
@@ -119,7 +126,251 @@ My advisor is cool.
 
 
 \chapter{Introduction}
+\section{Background and Motivation}
+Large language model progress has increasingly shifted from pretraining scale alone to post-training methods that improve reasoning performance. In current practice, many high-performing reasoning models are trained with pipelines that include supervised fine-tuning and reinforcement learning. Empirically, RL stages often produce stronger gains on difficult reasoning benchmarks, especially when the task requires multi-step exploration and verification.
+
+
+At the same time, there is active debate about what RL is actually doing. One view is that RL mainly performs \emph{sharpening}: increasing probability on solutions the base model already knows \citep{yueDoesReinforcementLearning2025}. A second view is that RL enables \emph{new compositional behavior}, including chaining and exploration on hard tasks \citep{yuanLLMsLearnNewSkills2025}. This thesis focuses on this gap.
+
+To study this in a controlled setting, Weuse a compositional synthetic task based on string transformations. The task is simple enough to analyze precisely, but expressive enough to expose the same core failure mode seen in larger benchmarks: models can learn atomic operations, yet struggle to compose them into longer reasoning chains.
+
+\section{Problem Statement}
+The central problem is to explain the emergence of compositional generalization during post-training. Compositional generalization is the ability to compose multiple sub-skills to solve harder problems. This thesis focuses on string functions as the task of interest, where the goal is to compose multiple atomic functions to solve a harder problem. A problem's difficulty is controlled by the number of compositions in the problem.
+Specifically:
+\begin{itemize}
+\item Why does RL outperform SFT when we evaluate beyond the training composition depth?
+\item Is the advantage primarily due to on-policy data, negative learning signals, or other RL-specific objective terms?
+\item Can we construct SFT-like or hybrid objectives that recover most of RL's compositional gains?
+\end{itemize}
+
+
+\section{Contributions}
+\begin{itemize}
+\item We define a mechanism-focused experimental framework for compositional generalization using controllable string-function tasks.
+\item We provide empirical evidence that RL substantially outperforms off-policy SFT on higher composition levels under matched compute.
+\item We show that filtering-based improvements to off-policy SFT do not recover the RL gap, even when demonstration quality is increased.
+\item We decompose the RL-vs-SFT question into component axes: on-policy data, negative samples, and objective design.
+\item We propose a concrete progression from SFT to GRPO-style training to isolate which ingredients are necessary for composition.
+\end{itemize}
+
+
+\chapter{Related Work}
+\section{Training Large Reasoning Models}
+
+The development of reasoning-capable LLMs has been shaped by a progression of post-training techniques.
+Early work introduced bootstrapping via self-generated reasoning traces \citep{zelikmanSTaRBootstrappingReasoning2022}, and reinforcement learning from human feedback established RL as a practical post-training tool \citep{ouyangTrainingLanguageModels2022}.
+More recently, DeepSeek-R1 \citep{deepseek-aiDeepSeekR1IncentivizingReasoning2025} demonstrated that RL training directly from a base model (zero-RL) can produce strong reasoning behavior, while also finding that a supervised cold-start further stabilizes training and improves downstream performance.
+Follow-up systems such as DAPO \citep{yuDAPOOpenSourceLLM2025} introduced objective modifications---clip-higher, entropy-aware rewards, and token-mean normalization---to prevent collapse during prolonged RL training.
+SimpleRL-Zoo \citep{zengSimpleRLZooInvestigatingTaming2025} investigated how problem difficulty, output length, and data diversity interact during zero-RL, finding that problem difficulty is critical and that long CoT SFT can suppress exploration.
+ProRL \citep{liuProRLProlongedReinforcement2025} studies the regime of extended RL training across many task categories and shows that maintaining exploration throughout requires explicit diversity incentives.
+
+The training dynamics of RL post-training are increasingly well characterized.
+Scaling laws for RL post-training follow power-law relationships with compute and data \citep{tanScalingBehaviorsLLM2025}.
+Work using synthetic reasoning tasks identifies an ``edge of competence'' effect: RL works best when the base model already has partial competence on a task, and the interplay between pretraining coverage, mid-training distribution, and RL optimization target is a key determinant of compositional generalization \citep{zhangInterplayPreTrainingMidTraining2025}.
+A separate line of work identifies specific behavioral primitives---verification, subgoal decomposition, backtracking, backward chaining---that make a model more compatible with RL training \citep{gandhiCognitiveBehaviorsThat2025}.
+
+Despite this progress, most production reasoning systems bundle curriculum schedules, data mixing, reward shaping, and objective modifications into a single pipeline, making it difficult to attribute improvements to specific mechanisms.
+This motivates the controlled decomposition approach taken in this thesis.
+
+\section{SFT versus Reinforcement Learning}
+
+Several studies argue that SFT and RL produce qualitatively different distributional changes.
+Under a controlled arithmetic task, \citet{chuSFTMemorizesRL2025} find that SFT improves in-distribution accuracy via memorization while RL generalizes to out-of-distribution settings by exploiting underlying model capabilities, and that SFT can stabilize format for downstream RL.
+A complementary trajectory-level analysis shows that RL reduces the proportion of incorrect completions while SFT increases the proportion of correct ones: RL compresses wrong trajectories, SFT expands right ones \citep{matsutaniRLSqueezesSFT2025}.
+These findings suggest the two methods differ not just in their objective but in which region of the output distribution they reshape.
+
+A second perspective emphasizes the formal relationship between SFT and RL.
+SFT on curated data can be viewed as maximizing a lower bound on a sparse-reward RL objective, and importance-weighted SFT tightens this bound and behaves more like RL \citep{qinSupervisedFineTuning2025}.
+A unified policy-gradient framework shows that SFT, DPO-style objectives, and RL share a common structure, with key distinctions being the data generating policy, the weighting over outcomes, and the stabilization constraint \citep{lvUnifiedViewLarge2026}.
+Combining SFT-style and RL-style signals in a single training stage can be mutually beneficial, with entropy serving as an informative diagnostic of training dynamics \citep{fuSRFTSingleStageMethod2025}.
+
+RL post-training also mitigates catastrophic forgetting.
+\citet{chenRetainingDoingRole2025} show that RL forgets prior capabilities significantly less than SFT at matched task performance, attributing this advantage primarily to on-policy data collection rather than to KL regularization or advantage weighting.
+\citet{laiReinforcementFineTuningNaturally2026} corroborate this in a continual post-training setting.
+More broadly, \citet{wuGeneralizationSFTReinforcement2025} characterize SFT as inducing a directional drift away from prior capabilities that RL counteracts, rather than discovering genuinely new solutions.
+
+While prior works have focused on studying the effects of SFT and RL separately, this thesis takes a more fine-grained approach by analyzing the component-wise contributions of SFT and RL.
+
+
+\section{Exploration and Sharpening}
+
+An influential debate concerns whether RL primarily \emph{sharpens} existing behaviors or whether it genuinely \emph{explores} new ones.
+The sharpening view holds that RL shifts probability mass toward high-reward completions that are already latent in the base model, improving pass@1 while potentially reducing pass@$k$ diversity. Evidence for this view comes from pass@$k$ analyses showing that base models eventually surpass RL-trained models at large $k$ \citep{yueDoesReinforcementLearning2025}, from theoretical characterizations of RLVR as support-constrained optimization that progressively narrows the exploration frontier \citep{wuInvisibleLeashWhy2026}, and from observations of entropy collapse during long training runs \citep{zhaoEchoChamberRL2025}.
+
+The exploration view holds that RL can discover qualitatively new strategies not well represented in the base model.
+SimpleRL-Zoo \citep{zengSimpleRLZooInvestigatingTaming2025} argues that exploration exceeds sharpening in accounting for RL gains.
+Methods that preserve exploration throughout training include entropy regularization \citep{cuiEntropyMechanismReinforcement2025}, representation-space novelty bonuses \citep{tuylsRepresentationBasedExplorationLanguage2025}, and experience replay strategies that revisit valuable earlier trajectories to prevent mode collapse \citep{douImprovingRLExploration2025,zhangRLEPReinforcementLearning2025,zhanExGRPOLearningReason2025}.
+
+
+\section{Extrapolation, Chaining, and Compositional Generalization}
+
+Compositional generalization, the ability to recombine known operations in novel arrangements, is a stringent test of systematic reasoning.
+LLMs often exhibit compositional deficiencies. Despite strong performance on individual skills, models often fail when those skills must be chained \citep{pressMeasuringNarrowingCompositionality2023,zhaoExploringCompositionalDeficiency2024}.
+The OMEGA benchmark operationalizes this by evaluating models that master atomic skills on compositional and transformative combinations, finding substantial failure rates for state-of-the-art models \citep{sunOMEGACanLLMs2025}.
+Theoretical analysis shows that data coverage required for multi-hop compositional generalization can grow super-linearly with task diversity, while models that leverage compositional structure or function reuse can generalize more efficiently \citep{abedsoltanTaskGeneralizationAutoRegressive2025}.
+
+
+
+The evidence that RL helps with compositional generalization is growing.
+Using a synthetic string-function task related to ours, \citet{yuanLLMsLearnNewSkills2025} show that RL enables models to compose $f(g(x))$ from separately learned $f$ and $g$, while off-policy SFT on the composed task fails to generalize.
+\citet{motwaniH1BootstrappingLLMs2025} demonstrate that RL with a curriculum of increasing compositional depth improves substantially even at high pass@$k$, suggesting genuine capability acquisition rather than pure sharpening.
+Composable chain-of-thought data is critical for enabling models to chain operations systematically, complementing RL supervision \citep{yinLearningComposableChainsofThought2025}.
+Work on pre/mid/post-training interactions using a synthetic task identifies an edge of competence in the base model as a prerequisite for RL-driven compositional generalization, and shows that mid-training can bridge the pretraining and post-training distributions to improve this precondition \citep{zhangInterplayPreTrainingMidTraining2025}.
+
+
+\section{On-Policy Training}
+
+A recurring theme in the SFT-versus-RL literature is the role of on-policy data.
+\citet{mingOneTokenRolloutGuiding2026} show that the performance gap between SFT and RL is largely attributable to the off-policy versus on-policy distinction rather than the form of the loss: converting static SFT data into token-level on-policy training consistently outperforms standard SFT.
+Taken to its logical conclusion, removing the KL regularization and group-wise normalization from a GRPO objective reduces the algorithm to on-policy SFT while still achieving competitive performance and substantially shorter reasoning traces \citep{zhaoOnPolicySupervisedFineTuning2026}.
+Anchored SFT \citep{zhuAnchoredSupervisedFineTuning2026} adds lightweight KL regularization to on-policy training to prevent distributional drift while preserving the tightness of the RL lower bound.
+
+These findings motivate the on-policy axis of our decomposition, but they also leave open a residual question: on-policy SFT does not generally close the full gap to RL, suggesting that other components---negative gradients and objective normalization---provide additional independent signal.
+This thesis directly tests whether on-policy data alone is sufficient or whether the combination of on-policy rollouts and negative updates is essential for compositional generalization.
+
+\section{Role of Negative Gradients in Training}
+
+Standard SFT provides only positive gradients: it increases the likelihood of correct trajectories without penalizing incorrect ones.
+RL objectives that use advantage weighting implicitly apply negative updates by suppressing below-average completions, but the causal contribution of this negative signal---relative to on-policy data collection---has received limited direct study.
+
+A first challenge is that naive use of negative samples can produce failure modes.
+In DPO, the standard contrastive loss can \emph{reduce} the absolute likelihood of preferred responses as long as the relative gap between preferred and dispreferred completions increases \citep{pal_smaug_2024}.
+DPO-Positive (DPOP) addresses this by adding a constraint that enforces preferred-response likelihood to remain above the reference model, and consistently outperforms standard DPO across datasets and tasks.
+An analogous issue arises in GRPO: \citet{deng_effect_2025} identify \emph{Lazy Likelihood Displacement} (LLD), where the likelihood of correct responses marginally increases or even decreases during training because all tokens in incorrect responses are penalized with equal strength regardless of their contribution.
+Their proposed fix, NTHR, down-weights penalties on tokens that cause LLD by using co-occurring correct responses as anchors.
+Crucially, they find that negative gradients are not inherently harmful---targeted token-level negative feedback does help---and that the failure mode stems from undifferentiated uniform penalization rather than the negative signal itself.
+
+A second line of evidence shows that negative samples carry genuine learning signal for generalization.
+\citet{tian_learning_2026} show that incorporating negative trajectories into SFT---specifically those with valid intermediate reasoning steps but incorrect final answers---yields substantial out-of-domain generalization gains over positive-only training.
+Mechanistically, these trajectories boost policy entropy by 35.67\% at inference time, facilitating exploration, and moderate loss descent during training to mitigate overfitting.
+The quality of the negative samples further modulates the benefit: \citet{di_not_2026} find that high-quality negatives exhibiting expected format and structural coherence consistently outperform randomly chosen or naively filtered incorrect responses across preference optimization methods.
+
+Taken together, these results establish that the negative gradient is a meaningful and distinct training signal whose effective exploitation requires attention to which tokens are penalized and what quality of negatives are used.
+In this thesis, we provide complementary evidence by directly measuring the causal contribution of the negative gradient component in GRPO on compositional generalization, isolating it from the on-policy data effect.
+
+
+\chapter{Compositional Generalization}
+\section{Task Definition}
+Compositional generalization is the ability to compose multiple atomic skills to solve a harder problem. Hence, benchmarks for compositional ability define the notion of an atomic skill and construct more complex tasks by composing these skills. Generally, we can measure the difficulty of the task by the amount of composition required to solve it. To make this more concrete, we study a toy task where the goal is to predict the output of functions that map strings to strings \citep{yuanLLMsLearnNewSkills2025}.
+
+\section{Toy Task: String Functions}
+We study compositional generalization using the string-function setting as proposed in \citet{yuanLLMsLearnNewSkills2025}. The model receives definitions of simple atomic functions and must predict outputs of composed programs. For example, a prompt may define \texttt{main\_solution(x) = func\_5(x, 'tt')} and ask for the output on a given input string. The model must reason through transformation order and return the final string.
+
+Difficulty is controlled by composition depth. A level-$i$ task requires composing $i$ operations. This allows direct extrapolation measurement: train at low depth, evaluate at higher depth.
+
+Training protocol:
+\begin{itemize}
+\item \textbf{Stage 1:} train on level-1 tasks to ensure atomic skill acquisition.
+\item \textbf{Stage 2:} train on level-2 tasks using different post-training methods.
+\item \textbf{Evaluation:} measure performance from level 1 to level 8.
+\end{itemize}
+
+This protocol separates ``knowing primitives'' from ``being able to compose.'' It also gives a clean setup for comparing learning signals.
+
+
+\section{Other Benchmarks}
+
+
+\section{Naive Supervised Fine-tuning}
+The first baseline is standard off-policy SFT using teacher-generated level-2 trajectories. Under matched compute, this approach improves level-2 performance relative to the Stage-1 checkpoint, but gains degrade quickly as depth increases. Performance on level-3 and above remains limited.
+
+We tested multiple filtering strategies to improve data quality:
+\begin{itemize}
+\item limiting the number of samples per problem,
+\item filtering by maximum correctness ratio to remove easy items,
+\item constraining trajectory lengths to remove very short or very long traces,
+\item requiring traces to explicitly reference both functions in a composition.
+\end{itemize}
+
+These interventions change sample quality and style but do not close the core gap to RL. A likely explanation is that filtering increases off-policy bias and reduces the alignment between training trajectories and the current model's action distribution.
+
+\section{Reinforcement Learning}
+We then train a Stage-2 model with GRPO-style reinforcement learning on level-2 tasks. Relative to matched-compute off-policy SFT, RL yields large improvements on level-2 and especially level-3 accuracy, indicating stronger compositional transfer.
+
+A representative comparison under matched training budget:
+\begin{itemize}
+\item off-policy SFT improves level-2 but has weak level-3 transfer,
+\item mixed SFT$\rightarrow$RL curricula help, but still lag full RL,
+\item RL-only gives the strongest performance on deeper levels.
+\end{itemize}
+
+These results motivate a mechanism question: does RL succeed because of on-policy rollouts, because of negative gradients, or because of additional objective components such as normalization and KL regularization?
+
+
+
+\chapter{Components of Reinforcement Learning}
+\section{On-Policy vs Off-Policy}
+The first decomposition axis is data policy. We compare:
+\begin{itemize}
+\item off-policy SFT,
+\item on-policy SFT (supervised objective on model-generated trajectories),
+\item mixed off-policy/on-policy curricula.
+\end{itemize}
+
+Motivation: recent work argues that on-policy training may explain a large portion of the SFT--RL gap. If true, then objective complexity can be reduced while preserving much of the gain.
+
+Preliminary observations from my runs suggest on-policy SFT alone does not fully match RL but can reduce part of the gap. This supports a ``data policy first'' hypothesis while leaving room for additional benefits from negative updates and weighting.
+
+\subsection{Effects of Data Quality on Performance}
+The filtering experiments highlight an important negative result: better-looking demonstrations are not sufficient. Even when using cleaner traces and shorter responses, off-policy SFT remains behind RL on extrapolative composition.
+
+This suggests that the missing ingredient is not just correctness of the target sequence, but the interaction between data collection policy and learning rule. In other words, \emph{how} samples are generated matters as much as \emph{which} samples are selected.
+
+\subsection{Bridging Off-Policy to On-Policy in SFT setting}
+
+
+
+\section{Use of negative samples}
+SFT vs DPO
+
+OSFT vs GRPO/OSFT with negative samples
+The second axis is whether training uses only positive trajectories or also learns from negatives. Standard SFT optimizes likelihood on accepted traces only. RL and preference-style objectives incorporate negative signals directly, either explicitly or through relative weighting.
+
+We evaluate several directions:
+\begin{itemize}
+\item unlikelihood training to push down incorrect generations,
+\item DPO-style contrastive updates,
+\item on-policy SFT with signed positive/negative weighting,
+\item GRPO variants that mask or retain negative gradients.
+\end{itemize}
+
+Current evidence and prior literature both suggest negative gradients are important for compositional exploration. Intuitively, they do not only increase good trajectories; they also suppress misleading local heuristics that block longer-horizon chaining.
+
+
+\chapter{Bridging the Gap}
+Using insights from the previous chapter, we bridge the gap between SFT and RL by establishing a natural progression from SFT to GRPO.
+
+\begin{enumerate}
+\item Off-policy SFT
+\item On-policy SFT
+\item Reinforce: On-policy training with positive/negative signals
+\item Reinforce with baseline: On-policy training with baseline normalization
+\item GRPO
+\end{enumerate}
+
+This progression enables component-level ablations rather than algorithm-level comparisons. The expected outcome is a response curve showing where composition gains appear abruptly versus gradually.
+
+The chapter's methodological claim is that ``RL vs SFT'' is too coarse. A more useful decomposition is \emph{data policy + sign of training signal + weighting/regularization}. This decomposition can guide both theory and practical recipe design using checkpoints that exist in the literature.
+
+
+\chapter{Transfer and Generality}
+After isolating mechanisms on string composition, We perform two generalization checks:
+\begin{itemize}
+\item \textbf{Task transfer:} evaluate whether composition-trained models improve on broader math, code, and general reasoning benchmarks.
+\item \textbf{Model-family transfer:} replicate key findings across model sizes and families (for example Llama and Qwen variants).
+\end{itemize}
+
+\todo{}
+
+
 \chapter{Conclusion}
+This thesis investigates compositional generalization as a mechanism-level post-training problem. In the controlled string-function setting, RL clearly outperforms off-policy SFT on deeper composition levels under matched compute. Attempts to improve off-policy SFT via filtering do not close this gap.
+
+The evidence points to a structured explanation: on-policy data matters, negative samples likely matter, and some objective-level RL machinery may be optional depending on the regime. This motivates a decomposed view of RL rather than treating it as a monolithic method.
+
+Practically, the work suggests a research path for designing cheaper and simpler training recipes that preserve compositional gains: start from on-policy supervised objectives, add explicit negative learning signals, and then layer in normalization or regularization only when needed.
+
+More broadly, the thesis contributes a way to study reasoning emergence with controlled extrapolation metrics and component-wise interventions. The long-term goal is to convert empirical ``RL works'' observations into precise, transferable principles for building reasoning-capable language models.
 
 %\appendix
 %\include{appendix}
@@ -134,6 +385,6 @@ My advisor is cool.
 %\renewcommand{\bibpreamble}{This text goes between the ``Bibliography''
 %  header and the actual list of references}
 \bibliographystyle{plainnat}
-\bibliography{register} %your bib file
+\bibliography{main} %your bib file
 
 \end{document}

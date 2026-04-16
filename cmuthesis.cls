@@ -68,11 +68,12 @@
 \vskip 3em
 
 \begin{center}
+    Computer Science Department \\
     School of Computer Science \\
     Carnegie Mellon University \\
-    Pittsburgh, PA 15213
+    Pittsburgh, PA 15213 
 \end{center}
-
+\vspace{1em}
 \begin{center}
     {\bf Thesis Committee:} \\
     \@committee
@@ -81,7 +82,7 @@
 \begin{center}
     \em
     Submitted in partial fulfillment of the requirements \\
-    for the degree of Doctor of Philosophy.
+    for the degree of Master of Science in Computer Science.
 \end{center}
 
 
