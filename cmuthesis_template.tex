@@ -129,12 +129,45 @@ Our findings suggest that effective post-training of LLMs requires understanding
 
 
 \chapter{Introduction}
-\section{Background and Motivation}
-\todo{insert background and motivation}
-\section{Problem Statement}
-\todo{insert problem statement}
-\section{Contributions}
-\todo{insert contributions}
+% Hook
+Recent advances in large language model post-training have produced a new class of systems capable of solving problems that once seemed far beyond reach: competition mathematics, graduate-level science questions, and complex multi-step code generation.
+The defining ingredient is reinforcement learning with verifiable rewards (RLVR), exemplified by DeepSeek-R1 \citep{deepseek-aiDeepSeekR1IncentivizingReasoning2025} and a wave of follow-up work.
+In these systems, a language model generates candidate solutions, a lightweight verifier checks correctness, and the model is updated to produce better solutions over time without human labels.
+As a result, these models can produce multi-chain reasoning traces that allow them to solve increasingly complex problems.
+
+% Need and Gap
+Yet the mechanisms behind how RL leads to reasoning ability remain poorly understood.
+At least three explanations compete in the literature.
+The \emph{sharpening} view holds that RLVR mostly concentrates probability mass on outputs already existing in the base model, improving single-sample accuracy without fundamentally expanding the model's capabilities \citep{yueDoesReinforcementLearning2025}.
+The \emph{on-policy} view argues that the key is the alignment between training data and the model's current distribution: because RL continuously generates rollouts from the evolving policy, it avoids the off-policy bias of static supervised datasets \citep{chenRetainingDoingRole2025,mingOneTokenRolloutGuiding2026}.
+The \emph{negative feedback} view emphasizes that unlike SFT, which only reinforces correct demonstrations, RL explicitly penalizes incorrect outputs, driving the model to avoid failure modes \citep{tian_learning_2026}. Other works also find that negative gradients are responsible for the increase in reasoning length, which is necessary for harder problems \citep{setlurE3LearningExplore2025}.
+In practice, modern RL pipelines bundle all of these effects together with additional ingredients (KL regularization, variance normalization, entropy shaping, curriculum schedules), making it difficult to attribute gains to any single cause.
+
+% Task
+This thesis investigates these mechanisms through the lens of \emph{compositional generalization}: the ability to chain multiple known atomic skills togehter to solve more complex problems.
+Compositional generalization is a key ingredient in general reasoning ability. A model solving a complex problem may need to decompose the task into multiple sub-tasks and solve each sub-task sequentially. 
+Crucially, the gap between SFT and RL is especially pronounced here: SFT-trained models plateau sharply as composition depth increases, while RL-trained models continue to improve, creating a clean and measurable performance separation \citep{yuanLLMsLearnNewSkills2025, cheng_atomic_2025}.
+We use the string-function composition task introduced by \citet{yuanLLMsLearnNewSkills2025}, where the model must predict the output of composed string transformations of increasing depth.
+
+% Method
+Our approach decomposes training into two orthogonal axes and varies each independently.
+The first axis is \textbf{data}: we compare teacher-generated off-policy data, base-model bootstrapped data, and fully on-policy rollouts, asking how the source of training trajectories affects compositional performance.
+The second axis is the \textbf{loss function}: starting from plain SFT (positive samples only), we progressively introduce negative gradient updates, a group mean baseline, and variance normalization, arriving at the full GRPO objective.
+By crossing these two axes we construct a grid of training methods that interpolates between standard off-policy SFT and standard GRPO, isolating the contribution of each component and creating a \emph{unified framework} to understand existing post-training paradigms.
+
+% Results
+\todo{Add experimental results}
+
+
+This thesis makes the following contributions:
+\todo{Fill in once we have a more complete experimental results}
+\begin{enumerate}
+    \item \textbf{A unified decomposition framework.} We organize SFT and RL variants under a common framework parameterized by data policy (off-policy to on-policy) and loss function (positive-only to positive+negative to GRPO). This framework clarifies the design space and enables controlled ablations.
+    \item \textbf{Demonstration of a large SFT--GRPO gap on compositional generalization.} 
+    \item \textbf{On-policy data is a key component}: \todo{}
+    \item \textbf{Use of negative gradients is a key component}: \todo{}
+\end{enumerate}
+
 
 \chapter{Related Work}
 \section{Training Large Reasoning Models}
@@ -236,22 +269,24 @@ In this thesis, we provide complementary evidence by directly measuring the caus
 Compositional generalization is the ability to compose multiple atomic skills to solve a harder problem. Hence, benchmarks for compositional ability define the notion of an atomic skill and construct more complex tasks by composing these skills. Generally, we can measure the difficulty of the task by the amount of composition required to solve it. To make this more concrete, we study a toy task where the goal is to predict the output of functions that map strings to strings \citep{yuanLLMsLearnNewSkills2025}.
 
 \section{Toy Task: String Functions}
-We study compositional generalization using the string-function setting as proposed in \citet{yuanLLMsLearnNewSkills2025}. The model receives definitions of simple atomic functions and must predict outputs of composed programs. For example, a prompt may define \texttt{main\_solution(x) = func\_5(x, 'tt')} and ask for the output on a given input string. The model must reason through transformation order and return the final string.
+\label{sec:string-function}
+We study compositional generalization using the string-function setting as proposed in \citet{yuanLLMsLearnNewSkills2025}. The model receives definitions of simple atomic functions and must predict outputs of composed programs.
+Note that difficulty is controlled by composition depth. A level-$i$ task requires composing $i$ operations. Figure \ref{fig:string-function} shows an example of string functions in this dataset. The dataset contains 25 unique string functions, split into 13 in the train set and 12 in the eval set. Note that with $i$ composed functions, any combination of string functions is a valid task, leading to exponentially many tasks as a function of $i$.
 
-\todo{insert figure of example string function: include prompt and answer}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{imgs/string-function.png}
+\caption{Figure of String Function Task from original paper \citep{yuanLLMsLearnNewSkills2025}}
+\label{fig:string-function} 
+\end{figure}
 
-Note that difficulty is controlled by composition depth. A level-$i$ task requires composing $i$ operations. This allows direct extrapolation measurement: train at low depth, evaluate at higher depth.
 
-\todo{insert example of level-2 task}
-
-We present the following training protocol:
+We follow the training protocol proposed in \citet{yuanLLMsLearnNewSkills2025}:
 \begin{itemize}
-\item \textbf{Stage 1:} in this stage, we train the model on level-1 tasks to ensure that the model has mastered the atomic skills
-\item \textbf{Stage 2:} we train on level-2 tasks using different post-training methods. We use level-2 tasks as they are the lowest difficulty tasks that requires composition.
+\item \textbf{Stage 1 Training:} In this stage, we train the model on level-1 tasks to ensure that the model has mastered the atomic skills. We call the resulting checkpoint \textbf{Base}, which is used as the starting point for all subsequent training.
+\item \textbf{Stage 2 Training:} We train on level-2 tasks using different post-training methods. We use level-2 tasks since they are the lowest difficulty tasks that requires composition.
 \item \textbf{Evaluation:} we measure performance on a separate evaluation set on tasks from level 1 to level 8. This allows us to see how performance extrapolates to higher composition levels.
 \end{itemize}
-
-
 
 
 \chapter{Decomposing Training Mechanisms}
@@ -352,44 +387,57 @@ $$ \ell_{\text{DPO}}(\theta) = - \mathbb{E}_{(x, y^+, y^-)} \left[ \log \sigma\l
 Intuitively, DPO incentivizes the likelihood of the positive sample to be greater than the likelihood of the negative sample. This does not fit well into our framework since it applies a non-linear function to the difference of the log probabilities.
 
 \chapter{Experiments}
+\section{Setup}
+We use Llama-3.1-8B-Instruct as the backbone model. As noted in section \ref{sec:string-function}, we train this model on level-1 tasks (Stage 1 Training) to ensure that the model has acquired the atomic skills. We call this checkpoint \textbf{Base}. Stage 1 Training uses Rejection Fine-Tuning (RFT) on 117k samples.
+In Stage 2 Training, we train the \textbf{Base} model with various training methods as described in the previous chapter. By evaluating the performance of the model on level-$i$ tasks with $i \ge 2$, we can measure the compositional generalization ability of the model.
+
+\subsection{Matching Compute}
+To conduct a fair comparision between methods, we utilize a matched compute setting, where compute is measured by the number of samples used in the training process. For On-policy methods, let $b$ be the batch size and $T$ be the total training steps. For each problem instance, we rollout $G$ samples (this is also the group size in GRPO). Then, the total number of samples used is $bTG$. For Off-policy methods, we use the teacher model or checkpoint model to generate $G$ solutions for $bT$ problem instances, matching the total sample count.
+
+One thing to note is that when we use SFT loss, we only use positive samples. However, we still measure the compute by the total number of samples \emph{before} filtering out the negatives.
+
+By default, we use a batch size of $b=16$ and $T=1200$ training steps, resulting in $19200$ unique problem instances. We use group size of $G=16$, resulting in total sample count of $307200$.
+
+
 \section{Baselines}
-\subsection{Naive Supervised Fine-tuning}
-The first baseline is standard off-policy SFT using teacher-generated level-2 trajectories. Under matched compute, this approach improves level-2 performance relative to the Stage-1 checkpoint, but gains degrade quickly as depth increases. Performance on level-3 and above remains limited.
+In order to understand the effect of different components, we establish lower and upper bounds for performance. Namely, the standard off-policy SFT method establishes the baseline lower bound performance. On the other hand, standard on-policy GRPO establishes our gold-standard upper bound in performance. Figure \ref{fig:baselines} shows the performance gap, which we hope to close by ablating various components.
 
-We tested multiple filtering strategies to improve data quality:
-\begin{itemize}
-\item limiting the number of samples per problem,
-\item filtering by maximum correctness ratio to remove easy items,
-\item constraining trajectory lengths to remove very short or very long traces,
-\item requiring traces to explicitly reference both functions in a composition.
-\end{itemize}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\textwidth]{imgs/baseline.png}
+\caption{Accuracy comparing the Base model to 2 training methods: SFT and GRPO}
+\label{fig:baselines}
+\end{figure}
 
-These interventions change sample quality and style but do not close the core gap to RL. A likely explanation is that filtering increases off-policy bias and reduces the alignment between training trajectories and the current model's action distribution.
-
-\subsection{GRPO}
-We then train a Stage-2 model with GRPO-style reinforcement learning on level-2 tasks. Relative to matched-compute off-policy SFT, RL yields large improvements on level-2 and especially level-3 accuracy, indicating stronger compositional transfer.
-
-A representative comparison under matched training budget:
-\begin{itemize}
-\item off-policy SFT improves level-2 but has weak level-3 transfer,
-\item mixed SFT$\rightarrow$RL curricula help, but still lag full RL,
-\item RL-only gives the strongest performance on deeper levels.
-\end{itemize}
-
-These results motivate a mechanism question: does RL succeed because of on-policy rollouts, because of negative gradients, or because of additional objective components such as normalization and KL regularization?
 
 
 \section{Data}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\textwidth]{imgs/data.png}
+\caption{Accuracy comparing Off-policy and On-policy SFT methods}
+\label{fig:data}
+\end{figure}
+
+Figure \ref{fig:data} shows the accuracy of different data sources.
+Surprisingly, on-policy SFT performs worse than off-policy SFT with teacher generated data. This may suggest that the quality of data matter. The teacher model generates much more correct solutions compared to the base model.
+
+We further support this hypothesis by applying different filtering strategies to the data to improve data quality.
+
+\todo{insert table/figure of filtering strategies}
 
 
 \section{Loss Function}
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\textwidth]{imgs/loss_fn.png}
+\caption{Accuracy comparing different loss functions under On-policy setting}
+\label{fig:loss_fn}
+\end{figure}
 
-\begin{enumerate}
-\item SFT
-\item Reinforce: On-policy training with positive/negative signals
-\item Reinforce with baseline: On-policy training with baseline normalization
-\item GRPO
-\end{enumerate}
+We find that after On-policy SFT training, the model's performance improves from the \textbf{Base} model. However, the gap between GRPO is still large. By adding negative samples, we see that we can recover the bulk of the performance gap. 
+
+\todo{add results for REINFORCE with baseline}
 
 
 \chapter{Transfer and Generality}
