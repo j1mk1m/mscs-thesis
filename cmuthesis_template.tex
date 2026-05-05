@@ -36,7 +36,8 @@
 \usepackage[backref,pageanchor=true,plainpages=false, pdfpagelabels, bookmarks,bookmarksnumbered,
 %pdfborder=0 0 0,  %removes outlines around hyper links in online display
 ]{hyperref}
-\usepackage{subfigure}
+%\usepackage{subfigure}
+\usepackage{subcaption}
 
 % Approximately 1" margins, more space on binding side
 %\usepackage[letterpaper,twoside,vscale=.8,hscale=.75,nomarginpar]{geometry}
@@ -57,7 +58,7 @@
 \author{\bf Gyeongwon James Kim}
 \date{May 2026}
 \Year{2026}
-\trnumber{CMU-CS-26-TBD}
+\trnumber{CMU-CS-26-107}
 
 \committee{
 Chenyan Xiong, Chair \\
@@ -136,36 +137,34 @@ In these systems, a language model generates candidate solutions, a lightweight 
 As a result, these models can produce multi-chain reasoning traces that allow them to solve increasingly complex problems.
 
 % Need and Gap
-Yet the mechanisms behind how RL leads to reasoning ability remain poorly understood.
-At least three explanations compete in the literature.
-The \emph{sharpening} view holds that RLVR mostly concentrates probability mass on outputs already existing in the base model, improving single-sample accuracy without fundamentally expanding the model's capabilities \citep{yueDoesReinforcementLearning2025}.
-The \emph{on-policy} view argues that the key is the alignment between training data and the model's current distribution: because RL continuously generates rollouts from the evolving policy, it avoids the off-policy bias of static supervised datasets \citep{chenRetainingDoingRole2025,mingOneTokenRolloutGuiding2026}.
-The \emph{negative feedback} view emphasizes that unlike SFT, which only reinforces correct demonstrations, RL explicitly penalizes incorrect outputs, driving the model to avoid failure modes \citep{tian_learning_2026}. Other works also find that negative gradients are responsible for the increase in reasoning length, which is necessary for harder problems \citep{setlurE3LearningExplore2025}.
-In practice, modern RL pipelines bundle all of these effects together with additional ingredients (KL regularization, variance normalization, entropy shaping, curriculum schedules), making it difficult to attribute gains to any single cause.
+Yet the mechanisms behind how RL leads to reasoning ability remain poorly understood. At least three explanations compete in the literature. The \emph{discovery} view explains that RL allows the model to discover novel solutions by exploring the solution space and being rewarded accordingly. On the other hand, the \emph{sharpening} view holds that RL mostly concentrates probability mass on outputs already existing in the base model, improving single-sample accuracy without fundamentally expanding the model's capabilities \citep{yueDoesReinforcementLearning2025}. Finally, the \emph{chaining} view argues that RL implicitly teaches the model to chain multiple skills together, which is necessary to solve complex reasoning problems \citep{setlurE3LearningExplore2025}.
 
-% Task
-This thesis investigates these mechanisms through the lens of \emph{compositional generalization}: the ability to chain multiple known atomic skills togehter to solve more complex problems.
-Compositional generalization is a key ingredient in general reasoning ability. A model solving a complex problem may need to decompose the task into multiple sub-tasks and solve each sub-task sequentially. 
-Crucially, the gap between SFT and RL is especially pronounced here: SFT-trained models plateau sharply as composition depth increases, while RL-trained models continue to improve, creating a clean and measurable performance separation \citep{yuanLLMsLearnNewSkills2025, cheng_atomic_2025}.
-We use the string-function composition task introduced by \citet{yuanLLMsLearnNewSkills2025}, where the model must predict the output of composed string transformations of increasing depth.
+Furthermore, it is unclear which components of RL are responsible for the success of RL algorithms like GRPO over standard SFT. Some works argue that the key is the alignment between training data and the model's current distribution: because RL continuously generates rollouts from the evolving policy, it avoids the off-policy bias of static supervised datasets \citep{chenRetainingDoingRole2025,mingOneTokenRolloutGuiding2026}.
+Other works show that unlike SFT, which only reinforces correct demonstrations, RL explicitly penalizes incorrect outputs, driving the model to avoid failure modes \citep{tian_learning_2026} and increasing the reasoning length, which is evidence for chaining \citep{setlurE3LearningExplore2025}.
+In practice, modern RL pipelines bundle all of these effects together with additional ingredients (KL regularization, variance normalization, entropy shaping, curriculum schedules), making it difficult to attribute gains to any single cause. \emph{This paper addresses this gap by presenting a \textbf{unified framework} that effectively organizes existing post-training methods and isolate core components for analysis.}
 
 % Method
-Our approach decomposes training into two orthogonal axes and varies each independently.
+In order to settle what makes RL based post-training effective, our approach decomposes training into two orthogonal axes and varies each independently.
 The first axis is \textbf{data}: we compare teacher-generated off-policy data, base-model bootstrapped data, and fully on-policy rollouts, asking how the source of training trajectories affects compositional performance.
-The second axis is the \textbf{loss function}: starting from plain SFT (positive samples only), we progressively introduce negative gradient updates, a group mean baseline, and variance normalization, arriving at the full GRPO objective.
+The second axis is the \textbf{loss function}: starting from the SFT loss function (positive samples only), we progressively introduce negative gradient updates, a group mean baseline, and variance normalization, arriving at the full GRPO objective.
 By crossing these two axes we construct a grid of training methods that interpolates between standard off-policy SFT and standard GRPO, isolating the contribution of each component and creating a \emph{unified framework} to understand existing post-training paradigms.
 
+% \el{Perhaps we should emphasize the unifying framework point earlier on?}
+% \jk{addressed}
+
+% Task
+We investigate training mechanisms through the lens of \emph{compositional generalization}: the ability to chain multiple known atomic skills together to solve more complex problems. Crucially, the gap between SFT and RL is especially pronounced here: SFT-trained models plateau sharply as composition depth increases, while RL-trained models continue to improve, creating a clean and measurable performance separation \citep{yuanLLMsLearnNewSkills2025, cheng_atomic_2025}.
+This is important, as compositional generalization is a key ingredient in general reasoning ability \citep{yueDoesReinforcementLearning2025, park_how_2025}. A model solving a complex problem may need to decompose the task into multiple sub-tasks and solve each sub-task sequentially. 
+We use the string-function composition task introduced by \citet{yuanLLMsLearnNewSkills2025}, where the model must predict the output of composed string transformations of increasing depth.
+
 % Results
-\todo{Add experimental results}
+Our experimental results show that the use of negative samples is a key factor that motivates compositional ability since performance improves greatly when introducing a naive training method for negative samples on top of SFT. We achieve another significant performance increase when using a simple normalization method that grounds the mean reward to 0. \todo{results}
 
-
-This thesis makes the following contributions:
-\todo{Fill in once we have a more complete experimental results}
+This paper makes the following contributions:
 \begin{enumerate}
     \item \textbf{A unified decomposition framework.} We organize SFT and RL variants under a common framework parameterized by data policy (off-policy to on-policy) and loss function (positive-only to positive+negative to GRPO). This framework clarifies the design space and enables controlled ablations.
-    \item \textbf{Demonstration of a large SFT--GRPO gap on compositional generalization.} 
     \item \textbf{On-policy data is a key component}: \todo{}
-    \item \textbf{Use of negative gradients is a key component}: \todo{}
+    \item \textbf{Use of negative gradients is a key component}: Loss functions that use negative samples to train greatly outperform SFT, which only uses positive samples. In addition, techniques that normalize the reward signal relative to the task's difficulty show the best performance over methods that naively train on positive and negative samples.
 \end{enumerate}
 
 
@@ -276,27 +275,50 @@ Note that difficulty is controlled by composition depth. A level-$i$ task requir
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.9\textwidth]{imgs/string-function.png}
-\caption{Figure of String Function Task from original paper \citep{yuanLLMsLearnNewSkills2025}}
+\caption{Overview of the string function task}
 \label{fig:string-function} 
 \end{figure}
 
-
-We follow the training protocol proposed in \citet{yuanLLMsLearnNewSkills2025}:
-\begin{itemize}
-\item \textbf{Stage 1 Training:} In this stage, we train the model on level-1 tasks to ensure that the model has mastered the atomic skills. We call the resulting checkpoint \textbf{Base}, which is used as the starting point for all subsequent training.
-\item \textbf{Stage 2 Training:} We train on level-2 tasks using different post-training methods. We use level-2 tasks since they are the lowest difficulty tasks that requires composition.
-\item \textbf{Evaluation:} we measure performance on a separate evaluation set on tasks from level 1 to level 8. This allows us to see how performance extrapolates to higher composition levels.
+We follow the training protocol proposed in \citet{yuanLLMsLearnNewSkills2025}. For any pretrained model, we \emph{initialize} the model by training it on level-1 tasks with standard Supervised Fine-Tuning. This ensures that the model masters the atomic tasks. We call the resulting checkpoint \textbf{Base}, which is used as the starting point for compositional training.
+\begin{itemize} 
+\item \textbf{Compositional Training:} To train for composition, we train on level-2 tasks starting from \textbf{Base}. We use level-2 tasks since they are the lowest difficulty tasks that requires composition. We train using various post-training methods including SFT, DPO, and GRPO, and analyzing their effectiveness.
+\item \textbf{Evaluation:} We measure performance on a separate evaluation set on tasks from level 1 to level 8. This allows us to see how performance extrapolates to higher composition levels.
 \end{itemize}
 
 
 \chapter{Decomposing Training Mechanisms}
-Our goal is to decompose the training mechanisms across various SFT and RL methods and organize them into a unified framework. As a starting point, we split training into two major components: data and loss function. Data refers to the way we source and select data that will be used for training. Loss function refers to the way we update the model parameters based on the data.
 
-\section{Data}
-A key ingredient in post-training is the data. We first consider the source of the data, then consider how we can curate and filter it.
+\section{A Unified Two-Axis Framework}
+\label{sec:methods}
 
-\subsection{Data Source}
-One common distinction between methods in RL is whether the data is on-policy or off-policy. On-policy data is generated by the current model, while off-policy data is generated by older models, humans, or teacher models. To study the role of data source, we formalize the following settings:
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|}
+\toprule
+ & \textbf{Positive Samples Only} & \textbf{Positive and Negative Samples} \\
+\midrule
+\textbf{Off-policy} & SFT & DPO \\
+\midrule
+\textbf{On-policy} & On-policy SFT & GRPO \\
+\bottomrule
+\end{tabular}
+\vspace{0.5em}
+\caption{The Unified Two-Axis Framework}
+\label{tab:unified-framework}
+\end{table}
+
+Our goal is to decompose the training mechanisms across various SFT and RL methods and organize them into a unified framework. As a starting point, we identify the two core factors that differentiate SFT with GRPO: on-policy data and use of negative samples for gradient updates. Table \ref{tab:unified-framework} classifies known post-training methods into a two-axis grid, which allows us to place popular post-training algorithms like SFT, DPO, and GRPO.
+We generalize the two components into the following axis:
+\begin{itemize}
+    \item \textbf{Data}: this involves the way we source and select data that will be used for training. 
+    \item \textbf{Loss function}: this involves the way we update the model parameters based on the data.
+\end{itemize}
+   
+   
+\section{Data Axis}
+
+% \subsubsection{Data Source}
+One common distinction between methods in RL is whether the data is on-policy or off-policy. On-policy data is generated by the current model being trained, while off-policy data is generated by a previous reference model, humans, or teacher models. To study the role of data source, we formalize the following settings:
 
 \begin{itemize}
     \item \textbf{Teacher}: teacher-generated trajectories
@@ -305,62 +327,39 @@ One common distinction between methods in RL is whether the data is on-policy or
     \item \textbf{On-policy}: on-policy trajectories throughout training
 \end{itemize}
 
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|l|l|}
+    \toprule
+    \textbf{Data Source} & \textbf{Classification} \\
+    \midrule
+    \textbf{Teacher} & Off-policy \\
+    \textbf{Bootstrap} & Off-policy \\
+    \textbf{Iterative($k$)} & Off-policy \\
+    \textbf{On-policy} & On-policy \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+  \caption{Classification of Data Source methods}
+  \label{tab:data-source-classification}
+\end{table}
+
 In accordance with the literature, we consider the \textbf{Teacher}, \textbf{Bootstrap}, and \textbf{Iterative} settings as Off-policy methods since they make gradient updates based on data from older models or teacher models. However, we can still smoothly transition from Off-policy to On-policy methods by increasing the number of model checkpoints used in the \textbf{Iterative} setting.
 
-
-\subsection{Data Policy}
-Data policy refers to the way we curate data for training. In addition to controlling the data source via on-policy vs off-policy methods mentioned previously, we can also apply additional filtering strategies to the data. For verifiable tasks, it is common practice to filter based on correctness ratios or trajectory lengths.
-For example, when training with GRPO, we can filter out groups that have 100\% accuracy or 0\% accuracy since this will result in a zero update signal.
-A common approach in fine-tuning is to use Rejection Fine-Tuning (RFT), which only trains on correct samples.
+% \todo{Second ablation method: interesting?}
+% Another way to control the data source is to use a mixture of off-policy and on-policy data \citep{yanLearningReasonOffPolicy2025}. At each training step, we generate on-policy samples and mix this with some existing set of off-policy samples. We call this setting \textbf{Mixture($p$)} where we can control $p$, the proportion of on-policy samples.
 
 
-\section{Decomposing the Loss Function}
+% \subsubsection{Data Policy}
+% Data policy refers to the way we curate data for training. In addition to controlling the data source via on-policy vs off-policy methods mentioned previously, we can also apply additional filtering strategies to the data. For verifiable tasks, it is common practice to filter based on correctness ratios or trajectory lengths.
+% For example, when training with GRPO, we can filter out groups that have 100\% accuracy or 0\% accuracy since this will result in a zero update signal.
+% A common approach in fine-tuning is to use Rejection Fine-Tuning (RFT), which only trains on correct samples.
+% We can use more complex data policy methods such as filtering out groups with accuracy above $\text{threshold}_{\text{high}}$ or below $\text{threshold}_{\text{low}}$. 
+% \todo{This is probably not too interesting. Maybe remove this section}
 
-We start with the loss function for GRPO. For simplicity, we remove the KL-divergence term.
 
-$$ \ell_{\text{GRPO}}(\theta) = - \mathbb{E}_{(x, \{ y\}^G)} \left[ \frac{1}{G} \Sigma_{i = 1}^G \widehat{A}_i \log \pi_\theta(y_i \vert x) \right]$$
-
-The advantage is defined as: $\widehat{A}_i = \frac{r_i - \mu}{\sigma}$ where $r_i$ is the reward, $\mu$ is the mean reward, and $\sigma$ is the standard deviation of the rewards within the group. Note that our task has a binary reward, so we have $r_i \in \{1, 0\}$.
-
-Consider the loss function for standard supervised fine-tuning on positive samples:
-
-$$ \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, y)} \left[ \frac{1}{T} \sum_{t = 1}^T \log \pi_\theta(y_t \vert x, y_{< t}) \right]$$
-
-For consistency with GRPO, we consider training on multiple rollouts of the same problem instance, which forms a group. Furthermore, we can rewrite the following term:
-\[
-    \log \pi_\theta(y \vert x) = \Sigma_{t = 1}^T \log \pi_\theta(y_t \vert x, y_{< t})
-\]
-
-Then, the loss simplifies to 
-\[
-    \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \frac{1}{T} \log \pi_\theta(y_i \vert x) \right]
-\]
-
-Since SFT only uses positive samples, we can think of the loss as:
-\[
-    \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \frac{1}{T} \log \pi_\theta(y_i \vert x) \right]
-\]
-
-To incorporate negative samples, we have the following loss:
-\[
-    \ell_{\text{POS+NEG}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \log \pi_\theta(y_i \vert x) - \boldsymbol{1}[r_i = 0] \cdot \log \pi_\theta(y_i \vert x) \right]
-\]
-This is essentially equivalent to the REINFORCE loss with rewards $r_i \in \{1, -1\}$. Then, we can further add a baseline to the REINFORCE loss where $\mu$ is the mean reward of the group:
-\[
-    \ell_{\text{REINFORCE+}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G (r_i - \mu) \cdot \log \pi_\theta(y_i \vert x) \right]
-\]
-
-Finally, we add normalization to get GRPO loss:
-\[
-    \ell_{\text{GRPO}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \left( \frac{r_i - \mu}{\sigma} \right) \cdot \log \pi_\theta(y_i \vert x) \right]
-\]
-
-Another setting used to isolate the effect of negative gradients is to apply a mask to the negative gradients in GRPO \citep{setlurE3LearningExplore2025}.
-\[
-    \ell_{\text{GRPOMask}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \left( \frac{r_i - \mu}{\sigma} \right) \cdot \log \pi_\theta(y_i \vert x) \right]
-\]
-
-As a unified framework, we can view these loss functions as applying different weights to positive and negative samples. Table \ref{tab:loss_function_comparison} summarizes how different loss functions weight positive and negative samples. 
+\section{Loss Function Axis}
+Our key insight is that we can view \emph{loss functions as methods that apply different weights to positive and negative samples.} Table \ref{tab:loss_function_comparison} summarizes how different loss functions weight positive and negative samples. Note that this understanding applies for tasks with binary reward ($r \in \{1, 0\}$).
 
 \begin{table}[h!]
 \centering
@@ -368,35 +367,95 @@ As a unified framework, we can view these loss functions as applying different w
 \toprule
 \textbf{Use of Negative Samples} & \textbf{Loss Function} & \textbf{Positive Weight} & \textbf{Negative Weight} \\
 \midrule
-\multirow{2}{*}{No} & SFT & $1$ & $0$ \\
-& GRPOMask & $(1 - \mu)/\sigma$ & $0$ \\
+\multirow{2}{*}{No} & SFT (\ref{eq:SFT}) & $1$ & $0$ \\
+& GRPOMask (\ref{eq:GRPOMask}) & $(1 - \mu)/\sigma$ & $0$ \\
 \midrule 
-\multirow{3}{*}{Yes} & POS+NEG & $1$ & $-1$ \\
-& REINFORCE+ & $1 - \mu$ & $- \mu$ \\
-& GRPO & $(1 - \mu)/\sigma$ & $-\mu/\sigma$ \\
+\multirow{3}{*}{Yes} & POS+NEG (\ref{eq:POS+NEG}) & $1$ & $-1$ \\
+& REINFORCE+ (\ref{eq:REINFORCE+}) & $1 - \mu$ & $- \mu$ \\
+& GRPO (\ref{eq:GRPO}) & $(1 - \mu)/\sigma$ & $-\mu/\sigma$ \\
 \bottomrule
 \end{tabular}
 \label{tab:loss_function_comparison}
+\vspace{0.5em}
 \caption{Comparison of loss functions by weights used for positive and negative samples.}
 \end{table}
 
-\subsection{DPO}
-DPO is another method that uses negative samples. It is defined as:
+First, we start with the standard loss function for Supervised Fine-Tuning (SFT).
 
-$$ \ell_{\text{DPO}}(\theta) = - \mathbb{E}_{(x, y^+, y^-)} \left[ \log \sigma\left( \beta \left( \log \frac{\pi_\theta(y^+ \mid x)}{\pi_{\text{ref}}(y^+ \mid x)} - \log \frac{\pi_\theta(y^- \mid x)}{\pi_{\text{ref}}(y^- \mid x)} \right) \right) \right]$$
-Intuitively, DPO incentivizes the likelihood of the positive sample to be greater than the likelihood of the negative sample. This does not fit well into our framework since it applies a non-linear function to the difference of the log probabilities.
+\[ \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, y)} \left[ \frac{1}{T} \sum_{t = 1}^T \log \pi_\theta(y_t \vert x, y_{< t}) \right] \]
+
+For consistency with RL training procedures, we consider SFT as generating multiple rollouts for the same problem instance and filtering the positive samples for training. Let $G$ denote the number of generated samples per problem. Furthermore, we can rewrite the following term:
+\[
+    \log \pi_\theta(y \vert x) = \Sigma_{t = 1}^T \log \pi_\theta(y_t \vert x, y_{< t})
+\]
+
+Then, the loss simplifies to 
+\[
+    \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, \{y\}^{G^+})} \left[ \frac{1}{G} \sum_{i = 1}^G \frac{1}{T} \log \pi_\theta(y_i \vert x) \right]
+\]
+where $G^+$ denotes the set of positive samples.
+
+Since SFT only uses positive samples, we can rewrite the loss as:
+\begin{equation}
+    \ell_{\text{SFT}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \frac{1}{T} \log \pi_\theta(y_i \vert x) \right]
+    \label{eq:SFT}
+    % \tag{SFT}
+\end{equation}
+
+This derivation demonstrates that SFT is a special case where positive samples have weight 1 and negative sample have weight 0.
+
+As a simple way to incorporate negative samples, we have the following loss function that increases likelihood of positive samples and decreases likelihood of negative samples:
+\begin{equation}
+    \ell_{\text{POS+NEG}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \log \pi_\theta(y_i \vert x) - \boldsymbol{1}[r_i = 0] \cdot \log \pi_\theta(y_i \vert x) \right]
+    \label{eq:POS+NEG}
+    % \tag{POS+NEG}
+\end{equation}
+
+This is essentially equivalent to REINFORCE \citep{10.1007/BF00992696} with rewards $r_i \in \{1, -1\}$ instead of $\{1, 0\}$. In other words, the loss function simply places $+1$ weight on positive samples and $-1$ weight on negative samples.
+
+Next, we can further add a baseline to the REINFORCE loss where $\mu$ is the mean reward of the group:
+\begin{equation}
+    \ell_{\text{REINFORCE+}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G (r_i - \mu) \cdot \log \pi_\theta(y_i \vert x) \right]
+    \label{eq:REINFORCE+}
+    % \tag{REINFORCE+}
+\end{equation}
+
+This takes into account the relationship of samples within $G$. If most samples in the group are correct, then the mean is high and the weight on each positive sample is low. On the other hand, if only a few samples are correct, the mean is low and the weight on positive samples are high. The same is true for negative samples. Hence, we can see loss \ref{eq:REINFORCE+} as placing $1- \mu$ weight on positive samples and $-\mu$ weight on negative samples.
+
+
+Finally, we use standard deviation $\sigma$ as a normalization factor to get to GRPO loss.
+\begin{equation}
+    \ell_{\text{GRPO}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \left( \frac{r_i - \mu}{\sigma} \right) \cdot \log \pi_\theta(y_i \vert x) \right]
+    \label{eq:GRPO}
+\end{equation}
+
+For simplicity, we do not consider clipping and KL-divergence penalty. In this simplified version, we see that GRPO loss weighs the samples using a group-normalized advantage: $\frac{1- \mu}{\sigma}$ for positive samples and $\frac{-\mu}{\sigma}$ for negative samples.
+
+
+Another setting used to isolate the effect of negative gradients is to apply a mask to the negative gradients in GRPO \citep{setlurE3LearningExplore2025}.
+\begin{equation}
+    \ell_{\text{GRPOMask}}(\theta) = - \mathbb{E}_{(x, \{y\}^G)} \left[ \frac{1}{G} \sum_{i = 1}^G \boldsymbol{1}[r_i = 1] \cdot \left( \frac{r_i - \mu}{\sigma} \right) \cdot \log \pi_\theta(y_i \vert x) \right]
+    \label{eq:GRPOMask}
+    % \tag{GRPOMask}
+\end{equation}
+
+
+% \section{Relation to DPO}
+% DPO is another method that uses negative samples. It is defined as:
+
+% $$ \ell_{\text{DPO}}(\theta) = - \mathbb{E}_{(x, y^+, y^-)} \left[ \log \sigma\left( \beta \left( \log \frac{\pi_\theta(y^+ \mid x)}{\pi_{\text{ref}}(y^+ \mid x)} - \log \frac{\pi_\theta(y^- \mid x)}{\pi_{\text{ref}}(y^- \mid x)} \right) \right) \right]$$
+% Intuitively, DPO incentivizes the likelihood of the positive sample to be greater than the likelihood of the negative sample. Since DPO applies a non-linear function to the difference of the log probabilities, it does not fit into the derivation from SFT to GRPO loss above.
+% Instead, DPO is an alternative way to introduce negative gradients outside of the main axis we examine.
+
 
 \chapter{Experiments}
+\label{sec:experiments}
 \section{Setup}
-We use Llama-3.1-8B-Instruct as the backbone model. As noted in section \ref{sec:string-function}, we train this model on level-1 tasks (Stage 1 Training) to ensure that the model has acquired the atomic skills. We call this checkpoint \textbf{Base}. Stage 1 Training uses Rejection Fine-Tuning (RFT) on 117k samples.
-In Stage 2 Training, we train the \textbf{Base} model with various training methods as described in the previous chapter. By evaluating the performance of the model on level-$i$ tasks with $i \ge 2$, we can measure the compositional generalization ability of the model.
+We use Llama-3.1-8B-Instruct as the backbone model. As noted in section \ref{sec:string-function}, we first train this model on level-1 tasks to ensure that the model has acquired the atomic skills. This setup stage uses Rejection Fine-Tuning (RFT) on 117k samples. We call the resulting checkpoint \textbf{Base}, which is used as the starting point for our main training methods.
+During \textbf{Compositional Training}, we train the \textbf{Base} model with various training methods as described in section \ref{sec:methods}. By evaluating the performance of the model on level-$i$ tasks with $i \ge 2$, we can measure the compositional generalization ability of the model.
 
 \subsection{Matching Compute}
-To conduct a fair comparision between methods, we utilize a matched compute setting, where compute is measured by the number of samples used in the training process. For On-policy methods, let $b$ be the batch size and $T$ be the total training steps. For each problem instance, we rollout $G$ samples (this is also the group size in GRPO). Then, the total number of samples used is $bTG$. For Off-policy methods, we use the teacher model or checkpoint model to generate $G$ solutions for $bT$ problem instances, matching the total sample count.
-
-One thing to note is that when we use SFT loss, we only use positive samples. However, we still measure the compute by the total number of samples \emph{before} filtering out the negatives.
-
-By default, we use a batch size of $b=16$ and $T=1200$ training steps, resulting in $19200$ unique problem instances. We use group size of $G=16$, resulting in total sample count of $307200$.
+To conduct a fair comparision between methods, we utilize a matched compute setting, where compute is measured by the number of samples used in the training process. For On-policy methods, let $b$ be the batch size and $T$ be the total training steps. For each problem instance, we rollout $G$ samples (this is also the group size in GRPO). Then, the total number of samples used is $bTG$. For Off-policy methods, we use the teacher model or checkpoint model to generate $G$ solutions for $bT$ problem instances, matching the total sample count. One thing to note is that when we use SFT loss, we only use positive samples. However, we still measure the compute by the total number of samples \emph{before} filtering out the negatives. By default, we use a batch size of $b=16$ and $T=1200$ training steps, resulting in $19200$ unique problem instances. We use group size of $G=16$, resulting in total sample count of $307200$.
 
 
 \section{Baselines}
@@ -409,55 +468,65 @@ In order to understand the effect of different components, we establish lower an
 \label{fig:baselines}
 \end{figure}
 
-
-
-\section{Data}
+\section{Data Axis}
 \begin{figure}[h!]
 \centering
 \includegraphics[width=0.8\textwidth]{imgs/data.png}
-\caption{Accuracy comparing Off-policy and On-policy SFT methods}
+\caption{Accuracy comparing Off-policy and On-policy SFT methods 
+}
 \label{fig:data}
 \end{figure}
 
-Figure \ref{fig:data} shows the accuracy of different data sources.
-Surprisingly, on-policy SFT performs worse than off-policy SFT with teacher generated data. This may suggest that the quality of data matter. The teacher model generates much more correct solutions compared to the base model.
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.8\textwidth]{imgs/sft_eval_response_length.png}
+\caption{Response length distribution on evaluation set for models trained with SFT on different data sources.}
+\label{fig:sft_response_length}
+\end{figure}
 
-We further support this hypothesis by applying different filtering strategies to the data to improve data quality.
-
-\todo{insert table/figure of filtering strategies}
+Figure \ref{fig:data} shows the accuracy of different data sources. All methods meaningfully improve performance over the Base model. Surprisingly, on-policy SFT performs worse than Teacher SFT (off-policy data). Figure \ref{fig:sft_response_length} demonstrates the response length distribution of the models after training. Not surprisingly, the distribution in the Bootstrap setting is similar to the Base model since the data used during training comes from the Base model. However, interestingly, we see 2 very distinct behaviors when comparing On-policy vs Teacher SFT settings. The teacher data comes from the GRPO checkpoint, which leads the model to imitate the long chain-of-thought trajectories. On the contrary, in the on-policy setting, the model contracts the response, leading to a decrease in overall response length and entropy throughout training. As a result, the teacher method generalizes better to unseen samples. 
+    
 
 
 \section{Loss Function}
 \begin{figure}[h!]
 \centering
-\includegraphics[width=0.8\textwidth]{imgs/loss_fn.png}
+\includegraphics[width=0.8\textwidth]{imgs/loss_fn_on_policy.png}
 \caption{Accuracy comparing different loss functions under On-policy setting}
 \label{fig:loss_fn}
 \end{figure}
 
-We find that after On-policy SFT training, the model's performance improves from the \textbf{Base} model. However, the gap between GRPO is still large. By adding negative samples, we see that we can recover the bulk of the performance gap. 
+\begin{figure}[h!]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{imgs/level2_accuracy.png}
+    \caption{Level 2 Eval Accuracy}
+    \label{fig:response_length_a}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{imgs/response_length.png}
+    \caption{Average Response length}
+    \label{fig:response_length_b}
+\end{subfigure}
+\caption{Accuracy and Average response length over training steps under On-policy data setting}
+\label{fig:response_length}
+\end{figure}
 
-\todo{add results for REINFORCE with baseline}
+We find that the gap between using SFT loss and GRPO loss is large. By adding negative samples (POS+NEG setting), we see that we can recover a significant chunk of the performance. However, there is still a performance gap, suggesting that naively adding negative gradients is not enough. Only after adding a baseline (REINFORCE+Baseline setting), we achieve very close to GRPO performance. This suggests that training benefits from a baseline that acts as a stabilizer and full group normalization is not necessary. Essentially, the baseline achieves the same effect as group normalization.
+
+Figure \ref{fig:response_length} shows the average response length during training. Crucially, we see that SFT loss (only training on positive samples) contracts response length while with negative samples, response length increase. We see that in GRPO and REINFORCE+Baseline settings, the response length increases steadily throughout training, achieving best performance around 1000 training steps. Interestingly, POS+NEG setting shows more instability in training as response length rapidly increases in the first stage, then gradually returns back to the Base model's levels. A possible explanation for this is that in the POS+NEG setting, the total magnitude of positive weights and negative weights are unbalanced. On the other hand, by adding a baseline (REINFORCE+Baseline, GRPO settings), we balance the magnitude of gradient updates from positive and negative samples. As a result, POS+NEG setting is more sensitive to the difficulty of tasks. 
+    
 
 
-\chapter{Transfer and Generality}
-After isolating mechanisms on string composition, We perform two generalization checks:
-\begin{itemize}
-\item \textbf{Task transfer:} evaluate whether composition-trained models improve on broader math, code, and general reasoning benchmarks.
-\item \textbf{Model-family transfer:} replicate key findings across model sizes and families (for example Llama and Qwen variants).
-\end{itemize}
+\chapter{Future Work}
 
-\todo{}
 
 
 \chapter{Conclusion}
-This thesis investigates compositional generalization as a mechanism-level post-training problem. In the controlled string-function setting, RL clearly outperforms off-policy SFT on deeper composition levels under matched compute. Attempts to improve off-policy SFT via filtering do not close this gap.
 
-The evidence points to a structured explanation: on-policy data matters, negative samples likely matter, and some objective-level RL machinery may be optional depending on the regime. This motivates a decomposed view of RL rather than treating it as a monolithic method.
-
-Practically, the work suggests a research path for designing cheaper and simpler training recipes that preserve compositional gains: start from on-policy supervised objectives, add explicit negative learning signals, and then layer in normalization or regularization only when needed.
-
-More broadly, the thesis contributes a way to study reasoning emergence with controlled extrapolation metrics and component-wise interventions. The long-term goal is to convert empirical ``RL works'' observations into precise, transferable principles for building reasoning-capable language models.
 
 %\appendix
 %\include{appendix}

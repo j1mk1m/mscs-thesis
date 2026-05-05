@@ -1,13 +1,14 @@
-\backcite {yuanLLMsLearnNewSkills2025}{{xi}{(document)}{Doc-Start}}
 \backcite {deepseek-aiDeepSeekR1IncentivizingReasoning2025}{{1}{1}{chapter.1}}
 \backcite {yueDoesReinforcementLearning2025}{{1}{1}{chapter.1}}
+\backcite {setlurE3LearningExplore2025}{{1}{1}{chapter.1}}
 \backcite {chenRetainingDoingRole2025}{{1}{1}{chapter.1}}
 \backcite {mingOneTokenRolloutGuiding2026}{{1}{1}{chapter.1}}
 \backcite {tian_learning_2026}{{1}{1}{chapter.1}}
 \backcite {setlurE3LearningExplore2025}{{1}{1}{chapter.1}}
-\backcite {cheng_atomic_2025}{{1}{1}{chapter.1}}
-\backcite {yuanLLMsLearnNewSkills2025}{{1}{1}{chapter.1}}
-\backcite {yuanLLMsLearnNewSkills2025}{{1}{1}{chapter.1}}
+\backcite {cheng_atomic_2025}{{2}{1}{chapter.1}}
+\backcite {yuanLLMsLearnNewSkills2025}{{2}{1}{chapter.1}}
+\backcite {yueDoesReinforcementLearning2025}{{2}{1}{chapter.1}}
+\backcite {yuanLLMsLearnNewSkills2025}{{2}{1}{chapter.1}}
 \backcite {zelikmanSTaRBootstrappingReasoning2022}{{3}{2.1}{section.2.1}}
 \backcite {ouyangTrainingLanguageModels2022}{{3}{2.1}{section.2.1}}
 \backcite {deepseek-aiDeepSeekR1IncentivizingReasoning2025}{{3}{2.1}{section.2.1}}
@@ -51,6 +52,5 @@
 \backcite {di_not_2026}{{6}{2.6}{section.2.6}}
 \backcite {yuanLLMsLearnNewSkills2025}{{7}{3.1}{section.3.1}}
 \backcite {yuanLLMsLearnNewSkills2025}{{7}{3.2}{section.3.2}}
-\backcite {yuanLLMsLearnNewSkills2025}{{7}{3.1}{figure.3.1}}
-\backcite {yuanLLMsLearnNewSkills2025}{{7}{3.2}{figure.3.1}}
-\backcite {setlurE3LearningExplore2025}{{11}{4.2}{section.4.2}}
+\backcite {yuanLLMsLearnNewSkills2025}{{7}{3.2}{figure.caption.4}}
+\backcite {setlurE3LearningExplore2025}{{11}{4.3}{equation.4.4}}
