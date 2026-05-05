@@ -85,19 +85,26 @@ For my family and friends who supported me through this journey.
 %% into different files and input them into this file...
 
 \begin{abstract}
-% Hook 
+% Hook
 % Motivation
 Recently, Large Reasoning Models (LRMs) have achieved impressive performance on a variety of reasoning tasks, including mathematics and code generation. Their long chains of reasoning enable scaling of inference-time computation, allowing them to solve increasingly complex problems. LRMs are typically post-trained from base models using supervised fine-tuning (SFT), reinforcement learning (RL), or a combination of both. RL is often hypothesized to be a key driver of reasoning ability, as it enables models to explore and discover new solutions. However, recent work suggests that RL may instead concentrate probability mass on existing solutions.
 % Problem
-The mechanisms by which RL leads to reasoning ability remain poorly understood. In this thesis, we study RL training mechanisms through the lens of compositional generalization—a key sub-skill of reasoning that involves combining atomic skills to solve more complex problems.
+The mechanisms by which RL leads to reasoning ability remain poorly understood, and modern RL pipelines bundle on-policy rollouts, negative gradients, baselines, variance normalization, and other components into a single procedure, making it difficult to attribute gains to any specific cause. In this thesis, we study RL training mechanisms through the lens of compositional generalization---a key sub-skill of reasoning that involves combining atomic skills to solve more complex problems.
+% Method
+We propose a unified two-axis framework that organizes SFT and RL methods along a \emph{data} axis (off-policy to on-policy) and a \emph{loss} axis (positive-only to positive-plus-negative to GRPO). This framework places SFT, on-policy SFT, DPO, and GRPO as instances of a shared design space and enables controlled ablations of individual components. We instantiate this framework on a string-function composition task, where models must predict the output of composed string transformations of increasing depth.
 % Findings
-We find that RL-trained models substantially outperform those trained with standard SFT on this task. To isolate the effects of RL, we decompose it into three components: on-policy data, the use of negative samples, and objective design. By ablating each component, we establish a progression from SFT to RL and identify their respective contributions. Empirically, we find that both on-policy data and negative samples are critical for the emergence of compositional generalization, while objective design choices (e.g., group normalization) have a relatively small impact.
-% conclusion
-Our findings suggest that effective post-training of LLMs requires understanding and carefully designing the individual components of the training pipeline, rather than treating RL as a monolithic improvement.
+Our experiments yield a clear hierarchy among RL components. On the data axis, on-policy data alone is insufficient: positive-only on-policy SFT contracts response length and entropy and underperforms teacher-distilled off-policy SFT at higher composition levels. On the loss axis, introducing negative gradients on top of on-policy training recovers a large fraction of the gap to GRPO, identifying the use of negative samples as the primary driver of compositional ability. Adding a group-mean baseline closes nearly all of the remaining gap, while the additional standard-deviation normalization in full GRPO contributes relatively little.
+% Conclusion
+These findings suggest that the bulk of GRPO's advantage on compositional generalization comes from the joint use of on-policy rollouts and baseline-stabilized negative gradients, rather than from group-wise variance normalization or other objective-level details. More broadly, effective post-training of LLMs benefits from a component-level view of training: practitioners can mix and match individual components to obtain most of RL's benefits, rather than treating RL as a monolithic improvement over SFT.
 \end{abstract}
 
-\begin{acknowledgments}
 
+\begin{acknowledgments}
+First and foremost, I would like to thank my advisor, Chenyan Xiong, for his invaluable guidance and support throughout the program. His insights shaped not only the direction of this thesis but also my growth as a researcher, and I am deeply grateful for his patience, encouragement, and mentorship.
+
+I am also grateful to Aditi Raghunathan for serving as my second reader and for offering thoughtful feedback that strengthened this work. I would like to extend special thanks to Emmy Liu, who generously shared her time, technical expertise, and perspective; many of the ideas and experiments in this thesis benefited directly from our discussions, and her guidance made this research process far more enjoyable.
+
+Finally, I want to thank my friends and family. Their unwavering love, patience, and encouragement carried me through every stage of this journey, and this thesis would not have been possible without them.
 \end{acknowledgments}
 
 
@@ -158,12 +165,12 @@ This is important, as compositional generalization is a key ingredient in genera
 We use the string-function composition task introduced by \citet{yuanLLMsLearnNewSkills2025}, where the model must predict the output of composed string transformations of increasing depth.
 
 % Results
-Our experimental results show that the use of negative samples is a key factor that motivates compositional ability since performance improves greatly when introducing a naive training method for negative samples on top of SFT. We achieve another significant performance increase when using a simple normalization method that grounds the mean reward to 0. \todo{results}
+Our experimental results reveal a clear hierarchy among the components of RL. On the data axis, on-policy data alone is not sufficient to close the gap to GRPO: on-policy SFT in fact underperforms teacher-distilled off-policy SFT, because training on positive-only on-policy rollouts contracts response length and entropy, suppressing the long chain-of-thought trajectories needed for higher-level composition. On the loss axis, introducing negative gradients on top of on-policy training (the POS+NEG setting) recovers a substantial portion of the gap to GRPO, identifying the use of negative samples as the key driver of compositional ability. Adding a group-mean baseline (REINFORCE+Baseline) recovers nearly all of the remaining gap, indicating that the baseline---rather than the additional standard-deviation normalization in full GRPO---is what stabilizes training. Together, these results show that the bulk of GRPO's advantage on compositional generalization comes from the combination of on-policy rollouts and negative gradients with a baseline, rather than from group-wise variance normalization or other objective-level details.
 
 This paper makes the following contributions:
 \begin{enumerate}
     \item \textbf{A unified decomposition framework.} We organize SFT and RL variants under a common framework parameterized by data policy (off-policy to on-policy) and loss function (positive-only to positive+negative to GRPO). This framework clarifies the design space and enables controlled ablations.
-    \item \textbf{On-policy data is a key component}: \todo{}
+    \item \textbf{On-policy data is necessary but not sufficient}: On-policy data is necessary to support the negative-gradient signal, since negative samples must be drawn from the model's own distribution to be informative. However, on its own, on-policy data does not close the gap to GRPO: positive-only on-policy SFT contracts response length and entropy and underperforms teacher-distilled off-policy SFT on higher composition levels.
     \item \textbf{Use of negative gradients is a key component}: Loss functions that use negative samples to train greatly outperform SFT, which only uses positive samples. In addition, techniques that normalize the reward signal relative to the task's difficulty show the best performance over methods that naively train on positive and negative samples.
 \end{enumerate}
 
@@ -523,9 +530,38 @@ Figure \ref{fig:response_length} shows the average response length during traini
 
 \chapter{Future Work}
 
+Our findings establish a controlled decomposition of RL components on the string-function task with Llama-3.1-8B-Instruct. To strengthen these conclusions and establish their broader relevance, two natural extensions are necessary.
+
+\section{Transfer to General Reasoning Tasks}
+
+The string-function setting was chosen because it isolates compositional generalization in a controlled way: atomic skills are well-defined, composition depth is precisely controllable, and outputs are exactly verifiable. A central open question is whether the component-wise findings established here transfer to the broader reasoning tasks that motivated this study in the first place---competition mathematics, code generation, and general-purpose multi-step reasoning.
+
+We propose two complementary directions for testing transfer. First, we can ask whether compositional ability acquired through our task functions as a transferable sub-skill. Concretely, we would compare a base model against a model trained on the string-function task and evaluate both on standard reasoning benchmarks such as MATH-500, AMC, AIME, OlympiadBench, code reasoning suites, and general reasoning benchmarks. If the compositionally trained model shows non-trivial improvements on these benchmarks despite the obvious surface-level mismatch, it would provide evidence that compositional generalization is a transferable primitive of reasoning rather than a task-specific artifact.
+
+Second, we can test whether the training-method conclusions themselves generalize. The hierarchy we identified---that on-policy rollouts plus negative gradients with a baseline recover most of GRPO's advantage---was established in a setting where reward is binary and verification is exact. Real reasoning tasks typically have noisier reward signals, longer chain-of-thought trajectories, and more complex failure modes. Re-running the unified two-axis decomposition on math and code benchmarks would test whether the same component hierarchy holds, and would identify which components, if any, are specific to the controlled compositional setting versus broadly applicable to reasoning post-training.
+
+\section{Generality across Model Families and Sizes}
+
+Our main experiments use Llama-3.1-8B-Instruct as the backbone. While this provides a clean and reproducible setting, it leaves open the question of whether our conclusions are specific to this model's pretraining distribution, scale, or instruction-tuning recipe. The role of negative gradients, in particular, may interact with how well-calibrated the base model is and with the entropy of its initial output distribution.
+
+To test generality, we plan to repeat the decomposition across several axes. Along the size axis, the Qwen3 family (0.6B, 1.7B, 4B, 8B, 14B) provides a controlled scaling sweep within a single pretraining recipe, enabling us to test whether the contribution of each RL component is stable across model scale or whether smaller models rely on different components than larger ones. Along the family axis, comparing Llama and Qwen models at matched scale would test whether the component hierarchy depends on pretraining data and instruction-tuning choices. A particularly informative outcome would be identifying a model where the hierarchy reverses---for example, a model where the baseline's stabilizing effect is absent or where positive-only on-policy SFT is sufficient---since such cases would refine our understanding of when and why each component matters.
+
+Together, these two extensions would convert the controlled findings of this thesis into more actionable guidance for practitioners designing post-training pipelines for reasoning models.
 
 
 \chapter{Conclusion}
+
+This thesis set out to answer a question that has become increasingly central to LLM post-training: \emph{what, exactly, makes reinforcement learning effective for compositional reasoning, and which of its many ingredients are responsible?} Modern RL pipelines such as GRPO bundle on-policy rollouts, negative gradients, group-mean baselines, variance normalization, KL regularization, and curriculum schedules into a single training procedure, making it difficult to attribute observed gains to any specific mechanism. Prior work has illuminated individual components in isolation, but no controlled study has placed them in a common framework that allows for direct head-to-head comparison.
+
+To address this, we proposed a unified two-axis decomposition of post-training methods. The \emph{data} axis ranges from teacher-distilled and bootstrapped off-policy data to fully on-policy rollouts, while the \emph{loss} axis ranges from positive-only SFT through positive-plus-negative gradients, REINFORCE with a group-mean baseline, and finally to the full GRPO objective. This grid places SFT, on-policy SFT, DPO, and GRPO as instances of a shared design space and exposes the components that distinguish them. We instantiated this framework on the string-function composition task, which provides a clean, controllable test of compositional generalization where the SFT-versus-RL gap is large and easily measurable.
+
+Our experiments yield a clear hierarchy among RL components. On the data axis, on-policy data alone is insufficient: positive-only on-policy SFT contracts response length and entropy and underperforms teacher-distilled off-policy SFT at higher composition levels. On the loss axis, introducing negative gradients on top of on-policy training recovers a large fraction of the gap to GRPO, identifying the use of negative samples as the primary driver of compositional ability. Adding a group-mean baseline closes nearly all of the remaining gap, while the additional standard-deviation normalization in full GRPO contributes relatively little. Taken together, the bulk of GRPO's advantage on compositional generalization comes from the combination of on-policy rollouts and negative gradients with a stabilizing baseline, rather than from group-wise variance normalization or other objective-level details.
+
+These findings carry two broader implications. First, they support a \emph{component-level} view of post-training: rather than treating RL as a monolithic improvement over SFT, practitioners can mix and match individual components---negative gradients, baselines, on-policy data---to obtain most of RL's benefits at lower implementation and compute cost. Second, they sharpen the ongoing debate over why RL works for reasoning. Our results are consistent with the view that negative gradients enable the model to suppress unproductive reasoning patterns rather than merely sharpen existing ones, and that on-policy data primarily serves to make this negative signal informative rather than to drive learning on its own.
+
+Several limitations remain. Our conclusions are established on a single controlled task and a single backbone model, and the binary, exactly verifiable reward of the string-function setting is simpler than rewards encountered in math and code benchmarks. Extending the decomposition to general reasoning tasks and to additional model families and sizes, as outlined in the Future Work chapter, is necessary to determine which parts of the component hierarchy are universal and which are task- or model-specific.
+
+This thesis contributes a unified framework, a controlled set of ablations, and a concrete attribution of GRPO's advantage to the joint use of on-policy rollouts and baseline-stabilized negative gradients. We hope these results help shift post-training research toward principled, component-wise analysis, and ultimately toward more transparent and efficient training of reasoning-capable language models.
 
 
 %\appendix
